@@ -1,6 +1,7 @@
 package com.bugtracker.app.security;
 
 import com.bugtracker.app.repository.UserRepository;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,19 +45,28 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
-        String email = jwtService.extractEmail(token);
 
-        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = userRepository.findByEmail(email).orElse(null);
+        try {
+            String email = jwtService.extractEmail(token);
 
-            if (userDetails != null && jwtService.isTokenValid(token, userDetails)) {
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails, null, userDetails.getAuthorities());
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = userRepository.findByEmail(email).orElse(null);
+
+                if (userDetails != null && jwtService.isTokenValid(token, userDetails)) {
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails, null, userDetails.getAuthorities());
+                    authToken.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+        } catch (JwtException | IllegalArgumentException ex) {
+            // Invalid, expired, or malformed token — don't crash the filter chain.
+            // Just leave the request unauthenticated; Spring Security's
+            // AuthenticationEntryPoint (our custom JSON handler) takes it
+            // from here and returns a clean 401.
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
