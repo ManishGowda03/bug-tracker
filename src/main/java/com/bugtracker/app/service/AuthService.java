@@ -30,7 +30,8 @@ public class AuthService {
                 .name(request.getName())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword())) // never store plain text
-                .role(request.getRole())
+.role(com.bugtracker.app.enums.Role.REPORTER) // everyone starts as REPORTER; promotion is a separate admin-only action
+// 
                 .build();
 
         userRepository.save(user);
